@@ -23,6 +23,7 @@ EOF
 sudo apt-get -qq update
 sudo apt-get install software-properties-common -y
 curl --fail --retry 3 --retry-delay 1 --connect-timeout 3 --max-time 30 https://cli-assets.heroku.com/install-ubuntu.sh | sh
+sudo apt-get install python build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev -y
 
 if [ -n "$HEROKU_API_KEY" ]; then
   yes | heroku keys:add
