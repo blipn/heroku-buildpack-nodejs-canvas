@@ -102,10 +102,10 @@ fail_iojs_unsupported() {
        }
 
        io.js merged back into Nodejs.org in 2015 and has been unsupported
-       for many years. It is likely to contain several large security 
+       for many years. It is likely to contain several large security
        vulnerabilities that have been patched in Node.
 
-       You can update your app to use the official Node.js release by 
+       You can update your app to use the official Node.js release by
        removing the version specfication under \"engines\" in your
        package.json.
        "
@@ -139,7 +139,7 @@ fail_multiple_lockfiles() {
          the package-lock.json file.
 
          $ git rm package-lock.json
-    " https://kb.heroku.com/why-is-my-node-js-build-failing-because-of-conflicting-lock-files
+    " https://help.heroku.com/0KU2EM53
     fail
   fi
 
@@ -163,7 +163,7 @@ fail_multiple_lockfiles() {
        - yarn.lock
        - package-lock.json
        - npm-shrinkwrap.json
-    " https://kb.heroku.com/why-is-my-node-js-build-failing-because-of-conflicting-lock-files
+    " https://help.heroku.com/0KU2EM53
     fail
   fi
 }
@@ -210,8 +210,8 @@ fail_yarn_lockfile_outdated() {
        $ yarn install
        $ git add yarn.lock
        $ git commit -m \"Updated Yarn lockfile\"
-       $ git push heroku master
-    " https://kb.heroku.com/why-is-my-node-js-build-failing-because-of-an-outdated-yarn-lockfile
+       $ git push heroku main
+    " https://help.heroku.com/TXYS53YJ
     fail
   fi
 }
@@ -278,7 +278,7 @@ fail_node_install() {
        \"engines\": {
          \"node\": \"6.11.1\"
        }
-    " https://kb.heroku.com/why-is-my-node-js-build-failing-because-of-no-matching-node-versions
+    " https://help.heroku.com/6235QYN4/
     fail
   fi
 }
@@ -314,7 +314,7 @@ fail_yarn_install() {
        \"engines\": {
          \"yarn\": \"1.x\"
        }
-    " https://kb.heroku.com/why-is-my-node-js-build-failing-because-of-no-matching-yarn-versions
+    " https://help.heroku.com/8MEL050H
     fail
   fi
 }
@@ -323,7 +323,7 @@ fail_invalid_semver() {
   local log_file="$1"
   if grep -qi 'Error: Invalid semantic version' "$log_file"; then
     mcount "failures.invalid-semver-requirement"
-    meta_set "invalid-semver-requirement"
+    meta_set "failure" "invalid-semver-requirement"
     echo ""
     warn "Invalid semver requirement
 
@@ -334,7 +334,97 @@ fail_invalid_semver() {
 
        However you have specified a version requirement that is not a valid
        semantic version.
-    " https://kb.heroku.com/why-is-my-node-js-build-failing-because-of-an-invalid-semver-requirement
+    " https://help.heroku.com/0ZIOF3ST
+    fail
+  fi
+}
+
+# Yarn 2 failures
+
+fail_missing_yarnrc_yml() {
+  local build_dir="$1"
+
+  if [[ ! -f "$build_dir/.yarnrc.yml" ]]; then
+    mcount "failures.missing-yarnrc-yml"
+    meta_set "failure" "missing-yarnrc-yml"
+    header "Build failed"
+    warn "The 'yarnrc.yml' file is not found
+
+      It looks like the 'yarnrc.yml' file is missing from this project. Please
+      make sure this file is checked into version control and made available to
+      Heroku.
+
+      To generate 'yarnrc.yml', make sure Yarn 2 is installed on your local
+      machine and set the version in your project directory with:
+
+       $ yarn set version berry
+
+      Read more at the Yarn docs: https://yarnpkg.com/getting-started/install#per-project-install
+      "
+    fail
+  fi
+}
+
+fail_missing_yarn_path() {
+  local build_dir="$1"
+  local yarn_path="$2"
+
+  if [[ "$yarn_path" == "" ]]; then
+    mcount "failures.missing-yarn-path"
+    meta_set "failure" "missing-yarn-path"
+    header "Build failed"
+    warn "The 'yarnPath' could not be read from the 'yarnrc.yml' file
+
+      It looks like 'yarnrc.yml' is missing the 'yarnPath' value, which is needed
+      to identify the location of yarn for this build.
+
+      To regenerate 'yarnrc.yml' with the 'yarnPath' value set, make sure Yarn 2
+      is installed on your local machine and set the version in your project
+      directory with:
+
+       $ yarn set version berry
+
+      Read more at the Yarn docs: https://yarnpkg.com/getting-started/install#per-project-install
+      "
+    fail
+  fi
+}
+
+fail_missing_yarn_vendor() {
+  local build_dir="$1"
+  local yarn_path="$2"
+
+  if [[ ! -f "$build_dir/$yarn_path" ]]; then
+    mcount "failures.missing-yarn-vendor"
+    meta_set "failure" "missing-yarn-vendor"
+    header "Build failed"
+    warn "Yarn was not found
+
+      It looks like yarn is missing from $yarn_path, which is needed to continue
+      this build on Heroku. Yarn 2 recommends vendoring Yarn under the '.yarn/releases'
+      directory, so remember to check the '.yarn' directory into version control
+      to use during builds.
+
+      To generate the '.yarn' directory correctly, make sure Yarn 2 is installed
+      on your local machine and run the following in your project directory:
+
+       $ yarn install
+       $ yarn set version berry
+
+      Read more at the Yarn docs: https://yarnpkg.com/getting-started/install#per-project-install
+      "
+    fail
+  fi
+}
+
+fail_yarn_2_production() {
+  local build_dir="$1"
+
+  if [[ -n "$YARN_PRODUCTION" ]]; then
+    header "Build failed"
+    warn "
+      The --production flag is no longer used for installing production dependencies for entire projects, but is still used in workspaces. See https://devcenter.heroku.com/articles/migrating-to-yarn-2#update-heroku-environment-with-plug-n-play-remove-production-environment-variables for additional information.
+      "
     fail
   fi
 }
@@ -466,7 +556,7 @@ log_other_failures() {
        way into event-stream, a popular npm package. After triaging the malware,
        npm responded by removing flatmap-stream and event-stream@3.3.6 from the Registry
        and taking ownership of the event-stream package to prevent further abuse.
-      " https://kb.heroku.com/4OM7X18J/why-am-i-seeing-npm-404-errors-for-event-stream-flatmap-stream-in-my-build-logs
+      " https://help.heroku.com/4OM7X18J
       fail
     fi
 
@@ -581,6 +671,12 @@ warn() {
   echo ""
 }
 
+warn_aws_proxy() {
+  if { [[ -n "$HTTP_PROXY" ]] || [[ -n "$HTTPS_PROXY" ]]; } && [[ "$NO_PROXY" != "amazonaws.com" ]]; then
+    warn "Your build may fail if NO_PROXY is not set to amazonaws.com" "https://devcenter.heroku.com/articles/troubleshooting-node-deploys#aws-proxy-error"
+  fi
+}
+
 warn_node_engine() {
   local node_engine=${1:-}
   if [ "$node_engine" == "" ]; then
@@ -598,7 +694,7 @@ warn_node_engine() {
 warn_prebuilt_modules() {
   local build_dir=${1:-}
   if [ -e "$build_dir/node_modules" ]; then
-    warning "node_modules checked into source control" "https://blog.heroku.com/node-habits-2016#9-only-git-the-important-bits"
+    warning "node_modules checked into source control" "https://devcenter.heroku.com/articles/node-best-practices#only-git-the-important-bits"
     mcount 'warnings.modules.prebuilt'
     meta_set "checked-in-node-modules" "true"
   else

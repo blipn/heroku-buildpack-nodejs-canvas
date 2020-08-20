@@ -23,7 +23,7 @@ RSpec.configure do |config|
 end
 
 def successful_body(app, options = {})
-  retry_limit = options[:retry_limit] || 100 
+  retry_limit = options[:retry_limit] || 100
   path = options[:path] ? "/#{options[:path]}" : ''
   Excon.get("http://#{app.name}.herokuapp.com#{path}", :idempotent => true, :expects => 200, :retry_limit => retry_limit).body
 end
@@ -49,7 +49,7 @@ def run!(cmd)
 end
 
 def resolve_binary_path
-  RUBY_PLATFORM.match(/darwin/) ? './vendor/resolve-version-darwin' : './vendor/resolve-version-linux'
+  RUBY_PLATFORM.match(/darwin/) ? './lib/vendor/resolve-version-darwin' : './lib/vendor/resolve-version-linux'
 end
 
 def resolve_node_version(requirements, options = {})
@@ -63,12 +63,12 @@ def resolve_all_supported_node_versions(options = {})
   result = run!("#{resolve_binary_path} list node")
   list = result.lines().map { |line| line.split(' ').first }
   list.select do |n|
-    SemVersion.new(n).satisfies?('>= 6.0.0')
+    SemVersion.new(n).satisfies?('>= 10.0.0')
   end
 end
 
 def version_supports_metrics(version)
-  SemVersion.new(version).satisfies?('>= 8.0.0') && SemVersion.new(version).satisfies?('< 12.0.0')
+  SemVersion.new(version).satisfies?('>= 10.0.0') && SemVersion.new(version).satisfies?('< 15.0.0')
 end
 
 def get_test_versions
@@ -77,7 +77,7 @@ def get_test_versions
   elsif ENV['TEST_ALL_NODE_VERSIONS'] == 'true'
     versions = resolve_all_supported_node_versions()
   else
-    versions = resolve_node_version(['6.x', '8.x', '9.x', '10.x', '11.x'])
+    versions = resolve_node_version(['10.x', '12.x', '13.x', '14.x'])
   end
   puts("Running tests for Node versions: #{versions.join(', ')}")
   versions

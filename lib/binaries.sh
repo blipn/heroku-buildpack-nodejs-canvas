@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-RESOLVE="$BP_DIR/vendor/resolve-version-$(get_os)"
+RESOLVE="$BP_DIR/lib/vendor/resolve-version-$(get_os)"
 
 resolve() {
   local binary="$1"
@@ -12,9 +12,11 @@ resolve() {
   until [ $n -ge 5 ]
   do
     # if a user sets the HTTP_PROXY ENV var, it could prevent this from making the S3 requests
-    # it needs here. We can ignore this proxy for aws urls with NO_PROXY
-    # see testAvoidHttpProxyVersionResolutionIssue test
-    if output=$(NO_PROXY="amazonaws.com" $RESOLVE "$binary" "$versionRequirement"); then
+    # it needs here. We can ignore this proxy for aws urls with NO_PROXY. Some environments
+    # require a proxy for all HTTP requests, so the NO_PROXY ENV var should be set outside the
+    # script by the user
+    # see testAvoidHttpProxyVersionResolutionIssue test and README
+    if output=$($RESOLVE "$binary" "$versionRequirement"); then
       echo "$output"
       return 0
     # don't retry if we get a negative result
@@ -34,20 +36,27 @@ resolve() {
 
 install_yarn() {
   local dir="$1"
-  local version=${2:-1.x}
+  local version=${2:-1.22.x}
   local number url code resolve_result
 
-  echo "Resolving yarn version $version..."
-  resolve_result=$(resolve yarn "$version" || echo "failed")
+  if [[ -n "$YARN_BINARY_URL" ]]; then
+    url="$YARN_BINARY_URL"
+    echo "Downloading and installing yarn from $url"
+  else
+    echo "Resolving yarn version $version..."
+    resolve_result=$(resolve yarn "$version" || echo "failed")
 
-  if [[ "$resolve_result" == "failed" ]]; then
-    fail_bin_install yarn "$version"
+    if [[ "$resolve_result" == "failed" ]]; then
+      fail_bin_install yarn "$version"
+    fi
+
+    read -r number url < <(echo "$resolve_result")
+
+    echo "Downloading and installing yarn ($number)"
   fi
 
-  read -r number url < <(echo "$resolve_result")
-
-  echo "Downloading and installing yarn ($number)..."
   code=$(curl "$url" -L --silent --fail --retry 5 --retry-max-time 15 -o /tmp/yarn.tar.gz --write-out "%{http_code}")
+
   if [ "$code" != "200" ]; then
     echo "Unable to download yarn: $code" && false
   fi
@@ -60,28 +69,40 @@ install_yarn() {
     tar xzf /tmp/yarn.tar.gz -C "$dir" --strip 1
   fi
   chmod +x "$dir"/bin/*
-  echo "Installed yarn $(yarn --version)"
+
+  if $YARN_2; then
+    echo "Using yarn $(yarn --version)"
+  else
+    echo "Installed yarn $(yarn --version)"
+  fi
 }
 
 install_nodejs() {
-  local version=${1:-10.x}
+  local version=${1:-12.x}
   local dir="${2:?}"
   local code os cpu resolve_result
 
   os=$(get_os)
   cpu=$(get_cpu)
 
-  echo "Resolving node version $version..."
-  resolve_result=$(resolve node "$version" || echo "failed")
+  if [[ -n "$NODE_BINARY_URL" ]]; then
+    url="$NODE_BINARY_URL"
+    echo "Downloading and installing node from $url"
+  else
+    echo "Resolving node version $version..."
+    resolve_result=$(resolve node "$version" || echo "failed")
 
-  read -r number url < <(echo "$resolve_result")
+    read -r number url < <(echo "$resolve_result")
 
-  if [[ "$resolve_result" == "failed" ]]; then
-    fail_bin_install node "$version"
+    if [[ "$resolve_result" == "failed" ]]; then
+      fail_bin_install node "$version"
+    fi
+
+    echo "Downloading and installing node $number..."
   fi
 
-  echo "Downloading and installing node $number..."
   code=$(curl "$url" -L --silent --fail --retry 5 --retry-max-time 15 -o /tmp/node.tar.gz --write-out "%{http_code}")
+
   if [ "$code" != "200" ]; then
     echo "Unable to download node: $code" && false
   fi

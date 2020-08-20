@@ -27,15 +27,15 @@ run_if_present() {
   script=$(read_json "$build_dir/package.json" ".scripts[\"$script_name\"]")
 
   if [[ "$has_script_name" == "true" ]]; then
-    if $YARN; then
+    if $YARN || $YARN_2; then
       echo "Running $script_name (yarn)"
       # yarn will throw an error if the script is an empty string, so check for this case
       if [[ -n "$script" ]]; then
-        monitor "$script_name" yarn run "$script_name"
+        monitor "${script_name}-script" yarn run "$script_name"
       fi
     else
       echo "Running $script_name"
-      monitor "$script_name" npm run "$script_name" --if-present
+      monitor "${script_name}-script" npm run "$script_name" --if-present
     fi
   fi
 }
@@ -73,6 +73,19 @@ run_build_script() {
   fi
 }
 
+run_cleanup_script() {
+  local build_dir=${1:-}
+  local has_heroku_cleanup_script
+
+  has_heroku_cleanup_script=$(has_script "$build_dir/package.json" "heroku-cleanup")
+
+  if [[ "$has_heroku_cleanup_script" == "true" ]]; then
+    mcount "script.heroku-cleanup"
+    header "Cleanup"
+    run_if_present "$build_dir" 'heroku-cleanup'
+  fi
+}
+
 log_build_scripts() {
   local build_dir=${1:-}
 
@@ -91,8 +104,16 @@ yarn_node_modules() {
   monitor "yarn-install" yarn install --production="$production" --frozen-lockfile --ignore-engines 2>&1
 }
 
+yarn_2_install() {
+  local build_dir=${1:-}
+
+  echo "Running 'yarn install' with yarn.lock"
+  cd "$build_dir" || return
+  monitor "yarn-2-install" yarn install --immutable --immutable-cache 2>&1
+}
+
 yarn_prune_devdependencies() {
-  local build_dir=${1:-} 
+  local build_dir=${1:-}
 
   if [ "$NODE_ENV" == "test" ]; then
     echo "Skipping because NODE_ENV is 'test'"
@@ -106,7 +127,7 @@ yarn_prune_devdependencies() {
     echo "Skipping because YARN_PRODUCTION is '$YARN_PRODUCTION'"
     meta_set "skipped-prune" "true"
     return 0
-  else 
+  else
     cd "$build_dir" || return
     monitor "yarn-prune" yarn install --frozen-lockfile --ignore-engines --ignore-scripts --prefer-offline 2>&1
     meta_set "skipped-prune" "false"
@@ -139,7 +160,7 @@ npm_node_modules() {
   if [ -e "$build_dir/package.json" ]; then
     cd "$build_dir" || return
 
-    if [[ "$(experiments_get "use-npm-ci")" == "true" ]] && [[ "$(should_use_npm_ci "$build_dir")" == "true" ]]; then
+    if [[ "$(features_get "use-npm-ci")" == "true" ]] && [[ "$(should_use_npm_ci "$build_dir")" == "true" ]]; then
       meta_set "supports-npm-ci" "true"
       echo "Installing node modules"
       monitor "npm-install" npm ci --production="$production" --unsafe-perm --userconfig "$build_dir/.npmrc" 2>&1
@@ -180,7 +201,7 @@ npm_rebuild() {
 
 npm_prune_devdependencies() {
   local npm_version
-  local build_dir=${1:-} 
+  local build_dir=${1:-}
 
   npm_version=$(npm --version)
 

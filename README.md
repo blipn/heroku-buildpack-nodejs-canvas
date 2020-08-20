@@ -4,7 +4,7 @@
 
 This is the official [Heroku buildpack](http://devcenter.heroku.com/articles/buildpacks) for Node.js apps.
 
-[![Build Status](https://travis-ci.org/heroku/heroku-buildpack-nodejs.svg)](https://travis-ci.org/heroku/heroku-buildpack-nodejs)
+[![Build Status](https://travis-ci.com/heroku/heroku-buildpack-nodejs.svg?branch=main)](https://travis-ci.com/heroku/heroku-buildpack-nodejs)
 
 ## Documentation
 
@@ -12,6 +12,7 @@ For more information about using this Node.js buildpack on Heroku, see these Dev
 
 - [Heroku Node.js Support](https://devcenter.heroku.com/articles/nodejs-support)
 - [Getting Started with Node.js on Heroku](https://devcenter.heroku.com/articles/nodejs)
+- [Troubleshooting Node.js Deploys](https://devcenter.heroku.com/articles/troubleshooting-node-deploys)
 
 For more general information about buildpacks on Heroku:
 
@@ -20,16 +21,15 @@ For more general information about buildpacks on Heroku:
 
 ## Locking to a buildpack version
 
-In production, you frequently want to lock all of your dependencies - including
-buildpacks - to a specific version. That way, you can regularly update and
-test them, upgrading with confidence.
+In production, you may want to lock dependencies - including
+buildpacks - to a specific version.
 
 First, find the version you want from
 [the list of buildpack versions](https://github.com/heroku/heroku-buildpack-nodejs/releases).
 Then, specify that version with `buildpacks:set`:
 
 ```
-heroku buildpacks:set https://github.com/heroku/heroku-buildpack-nodejs#v83 -a my-app
+heroku buildpacks:set https://github.com/heroku/heroku-buildpack-nodejs#v170 -a my-app
 ```
 
 If you have trouble upgrading to the latest version of the buildpack, please
@@ -45,10 +45,20 @@ into the `$PATH` for easy use in subsequent buildpacks.
 Having trouble? Dig it? Feature request?
 
 - [help.heroku.com](https://help.heroku.com/)
-- [@jeremymorrell](http://twitter.com/jeremymorrell)
+- [@adamzdanielle](http://twitter.com/adamzdanielle)
 - [GitHub issues](https://github.com/heroku/heroku-buildpack-nodejs/issues)
 
-## Hacking
+## Development
+
+### Prerequisites
+
+For local development, you may need the following tools:
+
+- [Docker](https://hub.docker.com/search?type=edition&offering=community)
+- [Go 1.14](https://golang.org/doc/install#install)
+- [upx](https://upx.github.io/)
+
+### Deploying an app with a fork or branch
 
 To make changes to this buildpack, fork it on GitHub.
 Push up changes to your fork, then create a new Heroku app to test it,
@@ -65,10 +75,20 @@ heroku buildpacks:set <your-github-url>
 heroku buildpacks:set <your-github-url>#your-branch
 ```
 
+### Downloading Plugins
+
+In order to download the latest plugins that have been released, run the following:
+
+```
+plugin/download.sh v$VERSION
+```
+
+Make sure the version is in the format `v#`, ie. `v7`.
+
 ## Tests
 
 The buildpack tests use [Docker](https://www.docker.com/) to simulate
-Heroku's Cedar-14 and Heroku-16 containers.
+Heroku's stacks.
 
 To run the test suite:
 
@@ -76,18 +96,47 @@ To run the test suite:
 make test
 ```
 
-Or to just test in cedar or cedar-14:
+Or to just test a specific stack:
 
 ```
-make test-cedar-14
-make test-heroku-16
+make heroku-16
+make heroku-18
+make heroku-20
 ```
 
 The tests are run via the vendored
 [shunit2](https://github.com/kward/shunit2)
 test framework.
 
-## Updating go binaries
+### Debugging
 
-If you would like to develop and update the go binaries you will need to install 
-[go 1.12](https://golang.org/doc/install#install) and [upx](https://upx.github.io/)
+To display the logged build outputs to assist with debugging, use the "echo" and "cat" commands. For example:
+
+```sh
+test() {
+  local log_file var
+
+  var="testtest"
+  log_file=$(mktemp)
+  echo "this is the log file" > "$log_file"
+  echo "test log file" >> "$log_file"
+
+  # use `echo` and `cat` for printing variables and reading files respectively
+  echo $var
+  cat $log_file
+
+  # some cases when debugging is necessary
+  assertEquals "$var" "testtest"
+  assertFileContains "test log file" "$log_file"
+}
+```
+
+Running the test above would produce:
+
+```log
+testtest
+this is the log file
+test log file
+```
+
+The test output writes to `$STD_OUT`, so you can use `cat $STD_OUT` to read output.
